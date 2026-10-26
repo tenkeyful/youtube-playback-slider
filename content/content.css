@@ -1,0 +1,175 @@
+.yt-speed-slider-area {
+	--yssp-width: 80px;
+	--yssp-handle: 14px;
+	--yssp-pad: 12px;
+	--yssp-track-h: 4px;
+	--yssp-icon: 24px;
+	--yssp-value-w: 3.6ch;
+	--yssp-halo: 4px;
+	--yssp-inset-end: calc(var(--yssp-handle) / 2); /* handle radius */
+	--yssp-inset-start: calc(var(--yssp-handle) / 2 + var(--yssp-halo));
+	--yssp-gap: 8px; /* space after the play button */
+	--yssp-speed: 0.15s;
+	display: flex !important;
+	align-items: center !important;
+	margin-left: var(--yssp-gap) !important;
+}
+
+.yt-speed-slider-btn {
+	all: unset;
+	box-sizing: border-box;
+	display: flex;
+	align-items: center;
+	align-self: center;
+	height: 40px;
+	padding: 0 var(--yssp-pad);
+	color: #fff;
+	cursor: pointer;
+}
+
+.yt-speed-slider-btn:focus-visible {
+	outline: 2px solid rgba(255, 255, 255, 0.85);
+	outline-offset: -2px;
+	border-radius: 20px;
+}
+
+.yt-speed-slider-slot {
+	display: grid;
+	place-items: center;
+	width: var(--yssp-icon);
+	height: 24px;
+	font-family: "YouTube Noto", Roboto, Arial, sans-serif;
+	font-size: 14px;
+	font-weight: 500;
+	transition: width var(--yssp-speed) cubic-bezier(0.4, 0, 1, 1);
+}
+
+.yt-speed-slider-icon,
+.yt-speed-slider-value {
+	grid-area: 1 / 1;
+	pointer-events: none;
+	transition: opacity var(--yssp-speed) ease;
+}
+
+.yt-speed-slider-icon {
+	display: block;
+	width: var(--yssp-icon);
+	height: var(--yssp-icon);
+	opacity: 1;
+}
+
+.yt-speed-slider-value {
+	font: inherit;
+	line-height: 1;
+	color: #fff;
+	font-variant-numeric: tabular-nums; /* digits don't jitter while dragging */
+	white-space: nowrap;
+	user-select: none;
+	opacity: 0;
+}
+
+.yt-speed-slider-area:hover .yt-speed-slider-btn,
+.yt-speed-slider-area.is-focused .yt-speed-slider-btn {
+	padding-right: 0;
+}
+
+.yt-speed-slider-area:hover .yt-speed-slider-slot,
+.yt-speed-slider-area.is-focused .yt-speed-slider-slot {
+	width: var(--yssp-value-w);
+}
+
+.yt-speed-slider-area:hover .yt-speed-slider-icon,
+.yt-speed-slider-area.is-focused .yt-speed-slider-icon {
+	opacity: 0;
+}
+
+.yt-speed-slider-area:hover .yt-speed-slider-value,
+.yt-speed-slider-area.is-focused .yt-speed-slider-value {
+	opacity: 1;
+}
+
+/* collapsed to 0 width, expands on hover/keyboard focus */
+.yt-speed-slider-panel {
+	display: flex;
+	align-items: center;
+	align-self: center;
+	overflow: hidden;
+	width: 0;
+	height: 40px;
+	transition: width var(--yssp-speed) cubic-bezier(0.4, 0, 1, 1);
+}
+
+.yt-speed-slider-area:hover .yt-speed-slider-panel,
+.yt-speed-slider-area.is-focused .yt-speed-slider-panel {
+	width: calc(var(--yssp-width) + var(--yssp-pad));
+}
+
+.yt-speed-slider-slider {
+	position: relative;
+	flex: none;
+	width: var(--yssp-width);
+	height: 40px;
+	margin-right: var(--yssp-pad);
+	cursor: pointer;
+	touch-action: none;
+}
+
+.yt-speed-slider-slider:focus-visible {
+	outline: 2px solid rgba(255, 255, 255, 0.85);
+	outline-offset: 2px;
+	border-radius: 4px;
+}
+
+.yt-speed-slider-track-bg {
+	position: absolute;
+	top: 20px;
+	left: var(--yssp-inset-start);
+	right: var(--yssp-inset-end);
+	height: var(--yssp-track-h);
+	margin-top: calc(var(--yssp-track-h) / -2);
+	background: rgba(255, 255, 255, 0.3);
+	border-radius: 2px;
+	pointer-events: none;
+}
+
+.yt-speed-slider-fill {
+	position: absolute;
+	top: 20px;
+	left: var(--yssp-inset-start);
+	width: calc(
+		(100% - var(--yssp-inset-start) - var(--yssp-inset-end)) *
+			var(--yssp-ratio, 0)
+	);
+	height: var(--yssp-track-h);
+	margin-top: calc(var(--yssp-track-h) / -2);
+	background: #fff;
+	border-radius: 2px;
+	pointer-events: none;
+}
+
+.yt-speed-slider-handle {
+	position: absolute;
+	top: 20px;
+	left: calc(
+		var(--yssp-inset-start) +
+			(100% - var(--yssp-inset-start) - var(--yssp-inset-end)) *
+			var(--yssp-ratio, 0)
+	);
+	width: var(--yssp-handle);
+	height: var(--yssp-handle);
+	margin-left: calc(var(--yssp-handle) / -2);
+	margin-top: calc(var(--yssp-handle) / -2);
+	background: #fff;
+	border-radius: 50%;
+	box-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
+	pointer-events: none;
+	transition: box-shadow 0.1s ease;
+}
+
+.yt-speed-slider-slider:hover .yt-speed-slider-handle {
+	box-shadow: 0 0 0 var(--yssp-halo) rgba(255, 255, 255, 0.14);
+}
+
+.yt-speed-slider-slider.dragging .yt-speed-slider-handle {
+	box-shadow: 0 0 0 var(--yssp-halo) rgba(255, 255, 255, 0.26);
+}
