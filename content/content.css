@@ -1,13 +1,18 @@
 .yt-speed-slider-area {
-	--yssp-width: 80px;
-	--yssp-handle: 14px;
+	/* Slider geometry copied from YouTube's own .ytp-volume-slider (current
+	   "delhi" player): 52px slider, 12px round handle, 2px track, and a faint
+	   drop-shadow on handle + track. */
+	--yssp-width: 52px;
+	--yssp-handle: 12px;
+	--yssp-track-h: 2px;
+	--yssp-shadow: drop-shadow(0 0 1px rgba(0, 0, 0, 0.8));
+
 	--yssp-pad: 12px;
-	--yssp-track-h: 4px;
 	--yssp-icon: 24px;
 	--yssp-value-w: 3.6ch;
-	--yssp-halo: 4px;
-	--yssp-inset-end: calc(var(--yssp-handle) / 2); /* handle radius */
-	--yssp-inset-start: calc(var(--yssp-handle) / 2 + var(--yssp-halo));
+	--yssp-halo: 4px; /* room for the hover/drag ring (the panel clips overflow) */
+	--yssp-num-gap: 10px; /* number → start of track, like the native icon → track */
+	--yssp-end-pad: 15px; /* end of track → pill edge, measured on the native pill */
 	--yssp-gap: 8px; /* space after the play button */
 	--yssp-speed: 0.15s;
 	display: flex !important;
@@ -19,6 +24,7 @@
 	all: unset;
 	box-sizing: border-box;
 	display: flex;
+	justify-content: center;
 	align-items: center;
 	align-self: center;
 	height: 40px;
@@ -52,10 +58,11 @@
 }
 
 .yt-speed-slider-icon {
-	display: block;
-	width: var(--yssp-icon);
-	height: var(--yssp-icon);
-	opacity: 1;
+    display: block;
+    width: var(--yssp-icon);
+    height: var(--yssp-icon);
+    transform: translateX(-1.5px);
+    opacity: 1;
 }
 
 .yt-speed-slider-value {
@@ -70,7 +77,7 @@
 
 .yt-speed-slider-area:hover .yt-speed-slider-btn,
 .yt-speed-slider-area.is-focused .yt-speed-slider-btn {
-	padding-right: 0;
+	padding-right: calc(var(--yssp-num-gap) - var(--yssp-halo));
 }
 
 .yt-speed-slider-area:hover .yt-speed-slider-slot,
@@ -101,7 +108,7 @@
 
 .yt-speed-slider-area:hover .yt-speed-slider-panel,
 .yt-speed-slider-area.is-focused .yt-speed-slider-panel {
-	width: calc(var(--yssp-width) + var(--yssp-pad));
+	width: calc(var(--yssp-halo) + var(--yssp-width) + var(--yssp-end-pad));
 }
 
 .yt-speed-slider-slider {
@@ -109,7 +116,7 @@
 	flex: none;
 	width: var(--yssp-width);
 	height: 40px;
-	margin-right: var(--yssp-pad);
+	margin: 0 var(--yssp-end-pad) 0 var(--yssp-halo);
 	cursor: pointer;
 	touch-action: none;
 }
@@ -120,56 +127,46 @@
 	border-radius: 4px;
 }
 
+/* Empty track: native ::after, 20% white, flat ends, full slider width */
 .yt-speed-slider-track-bg {
 	position: absolute;
 	top: 20px;
-	left: var(--yssp-inset-start);
-	right: var(--yssp-inset-end);
+	left: 0;
+	right: 0;
 	height: var(--yssp-track-h);
 	margin-top: calc(var(--yssp-track-h) / -2);
-	background: rgba(255, 255, 255, 0.3);
-	border-radius: 2px;
+	background: rgba(255, 255, 255, 0.2);
+	filter: var(--yssp-shadow);
 	pointer-events: none;
 }
 
+/* Filled track: native ::before, white from the left end to the handle's centre */
 .yt-speed-slider-fill {
 	position: absolute;
 	top: 20px;
-	left: var(--yssp-inset-start);
+	left: 0;
 	width: calc(
-		(100% - var(--yssp-inset-start) - var(--yssp-inset-end)) *
-			var(--yssp-ratio, 0)
+		var(--yssp-ratio, 0) * (var(--yssp-width) - var(--yssp-handle)) +
+			var(--yssp-handle) / 2
 	);
 	height: var(--yssp-track-h);
 	margin-top: calc(var(--yssp-track-h) / -2);
 	background: #fff;
-	border-radius: 2px;
+	filter: var(--yssp-shadow);
 	pointer-events: none;
 }
 
+/* Handle: native 12px white circle; left edge runs 0 → (slider − handle) */
 .yt-speed-slider-handle {
 	position: absolute;
 	top: 20px;
-	left: calc(
-		var(--yssp-inset-start) +
-			(100% - var(--yssp-inset-start) - var(--yssp-inset-end)) *
-			var(--yssp-ratio, 0)
-	);
+	left: calc(var(--yssp-ratio, 0) * (var(--yssp-width) - var(--yssp-handle)));
 	width: var(--yssp-handle);
 	height: var(--yssp-handle);
-	margin-left: calc(var(--yssp-handle) / -2);
 	margin-top: calc(var(--yssp-handle) / -2);
 	background: #fff;
 	border-radius: 50%;
-	box-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
+	filter: var(--yssp-shadow);
 	pointer-events: none;
 	transition: box-shadow 0.1s ease;
-}
-
-.yt-speed-slider-slider:hover .yt-speed-slider-handle {
-	box-shadow: 0 0 0 var(--yssp-halo) rgba(255, 255, 255, 0.14);
-}
-
-.yt-speed-slider-slider.dragging .yt-speed-slider-handle {
-	box-shadow: 0 0 0 var(--yssp-halo) rgba(255, 255, 255, 0.26);
 }

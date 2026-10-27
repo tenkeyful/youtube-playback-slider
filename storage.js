@@ -65,12 +65,15 @@
 		return result;
 	}
 
+	// Returns a function that removes the listener again.
 	function onChange(callback) {
-		browser.storage.onChanged.addListener((changes, area) => {
+		const listener = (changes, area) => {
 			if (area === "local" && changes[KEY]) {
 				callback(normalize(changes[KEY].newValue));
 			}
-		});
+		};
+		browser.storage.onChanged.addListener(listener);
+		return () => browser.storage.onChanged.removeListener(listener);
 	}
 
 	global.YTSpeedSettings = {

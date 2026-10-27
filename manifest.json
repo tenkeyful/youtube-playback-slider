@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
-  "name": "YouTube Speed Slider",
-  "version": "1.2.0",
+  "name": "YouTube Playback Slider",
+  "version": "1.3.0",
   "description": "Replaces YouTube's volume slider with a playback speed one next to the play button.",
   "icons": {
     "32": "icon.svg",
@@ -9,6 +9,9 @@
     "96": "icon.svg",
     "128": "icon.svg"
   },
+  "host_permissions": [
+    "https://www.youtube.com/*"
+  ],
   "content_scripts": [
     {
       "matches": [

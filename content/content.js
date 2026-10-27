@@ -6,6 +6,11 @@
 
 	const MIN = YTSpeedSettings.MIN_SPEED;
 
+	// YouTube resets video.playbackRate when a video loads and after ads, so
+	// our speed is re-applied on these events. Our own speed is the source of
+	// truth: a rate change we didn't make is never adopted as the new speed.
+	const ENFORCE_EVENTS = ["loadedmetadata", "play", "playing"];
+
 	// for the remember current speed option
 	const videoKey = () =>
 		new URLSearchParams(location.search).get("v") || location.pathname;
@@ -27,19 +32,25 @@
 			this._saving = false;
 			this._saveAgain = false;
 
+			this._ready = false; // settings loaded from storage yet?
+			this._destroyed = false;
+			this._cleanups = []; // undo functions run by destroy()
+
 			this._removeExisting();
 			this._build();
 			this._bind();
 
 			this._loadState();
-			YTSpeedSettings.onChange((next) => {
-				const pending = this._saveTimer !== null || this._saving;
-				this._settings = pending
-					? { ...next, playbackSpeed: this._targetSpeed }
-					: next;
-				if (!pending) this._targetSpeed = next.playbackSpeed;
-				this._render();
-			});
+			this._cleanups.push(
+				YTSpeedSettings.onChange((next) => {
+					const pending = this._saveTimer !== null || this._saving;
+					this._settings = pending
+						? { ...next, playbackSpeed: this._targetSpeed }
+						: next;
+					if (!pending) this._targetSpeed = next.playbackSpeed;
+					this._render();
+				}),
+			);
 		}
 
 		_removeExisting() {
@@ -117,11 +128,8 @@
 				"aria-valuenow": "1",
 			});
 			const trackBg = make("div", "yt-speed-slider-track-bg");
-			slider.append(
-				trackBg,
-				make("div", "yt-speed-slider-fill"),
-				make("div", "yt-speed-slider-handle"),
-			);
+			const handle = make("div", "yt-speed-slider-handle");
+			slider.append(trackBg, make("div", "yt-speed-slider-fill"), handle);
 			panel.append(slider);
 
 			area.append(btn, panel);
@@ -131,7 +139,7 @@
 			this._btn = btn;
 			this._valueEl = value;
 			this._slider = slider;
-			this._track = trackBg;
+			this._handle = handle;
 		}
 
 		_bind() {
@@ -141,7 +149,7 @@
 				"pointerdown",
 				this._onPointerDown.bind(this),
 			);
-			this._slider.addEventListener("wheel", this._onWheel.bind(this), {
+			this._area.addEventListener("wheel", this._onWheel.bind(this), {
 				passive: false,
 			});
 			this._slider.addEventListener("keydown", this._onKeydown.bind(this));
@@ -154,18 +162,31 @@
 				this._area.classList.remove("is-focused");
 			});
 
-			this._video.addEventListener("ratechange", () => this._syncFromVideo());
-			document.addEventListener("yt-navigate-finish", () => this._onNavigate());
+			const enforce = () => this._enforce();
+			for (const type of ENFORCE_EVENTS)
+				this._video.addEventListener(type, enforce);
+
+			const onNavigate = () => this._onNavigate();
+			document.addEventListener("yt-navigate-finish", onNavigate);
+
+			this._cleanups.push(() => {
+				for (const type of ENFORCE_EVENTS)
+					this._video.removeEventListener(type, enforce);
+				document.removeEventListener("yt-navigate-finish", onNavigate);
+			});
 		}
 
 		// -- pointer drag --
 		_onPointerDown(e) {
 			this._slider.classList.add("dragging");
 			this._slider.setPointerCapture(e.pointerId);
-			const rect = this._track.getBoundingClientRect();
-			this._applyPointerX(e.clientX, rect);
+			// Measured once per drag. Like YouTube's own slider, the handle's
+			// centre travels from half a handle in to half a handle from the end.
+			const rect = this._slider.getBoundingClientRect();
+			const handleW = this._handle.offsetWidth;
+			this._applyPointerX(e.clientX, rect, handleW);
 
-			const onMove = (ev) => this._applyPointerX(ev.clientX, rect);
+			const onMove = (ev) => this._applyPointerX(ev.clientX, rect, handleW);
 			const onEnd = () => {
 				this._flushSave();
 				this._slider.classList.remove("dragging");
@@ -178,10 +199,11 @@
 			this._slider.addEventListener("pointercancel", onEnd);
 		}
 
-		_applyPointerX(clientX, rect) {
+		_applyPointerX(clientX, rect, handleW) {
+			const travel = Math.max(1, rect.width - handleW);
 			const ratio = Math.min(
 				1,
-				Math.max(0, (clientX - rect.left) / Math.max(1, rect.width)),
+				Math.max(0, (clientX - rect.left - handleW / 2) / travel),
 			);
 
 			const max = this._settings.maxSpeed;
@@ -236,7 +258,9 @@
 
 		async _loadState() {
 			this._settings = await YTSpeedSettings.get();
+			if (this._destroyed) return;
 			this._targetSpeed = this._settings.playbackSpeed;
+			this._ready = true;
 			if (!this._settings.rememberSpeed) this._setSpeed(1);
 			else this._render();
 		}
@@ -266,7 +290,6 @@
 		_applySpeed(speed) {
 			this._targetSpeed = speed;
 			this._settings = { ...this._settings, playbackSpeed: speed };
-			this._video.playbackRate = speed;
 			this._render();
 			this._scheduleSave();
 		}
@@ -297,19 +320,44 @@
 			}
 		}
 
-		_syncFromVideo() {
-			const rate = this._video.playbackRate;
-			if (Math.abs(rate - this._settings.playbackSpeed) < 0.001) return;
-			this._applySpeed(rate);
+		// Puts our speed on the video if something else (YouTube) changed it.
+		_pushRate() {
+			const speed = this._settings.playbackSpeed;
+			if (Math.abs(this._video.playbackRate - speed) > 0.001) {
+				this._video.playbackRate = speed;
+			}
+		}
+
+		_enforce() {
+			// Before settings have loaded we'd only be enforcing the default (1x).
+			if (this._ready && !this._destroyed) this._pushRate();
+		}
+
+		// True if this instance is still wired to this player and still in the DOM.
+		isAttachedTo(video, volumeArea) {
+			return (
+				!this._destroyed &&
+				this._video === video &&
+				this._volumeArea === volumeArea &&
+				this._area.isConnected &&
+				volumeArea.nextElementSibling === this._area
+			);
+		}
+
+		destroy() {
+			this._destroyed = true;
+			if (this._saveTimer !== null) this._flushSave(); // don't lose a pending save
+			clearTimeout(this._wheelTimer);
+			for (const undo of this._cleanups) undo();
+			this._cleanups = [];
+			this._area.remove();
 		}
 
 		_render() {
 			const speed = this._settings.playbackSpeed;
 			const max = this._settings.maxSpeed;
 
-			if (Math.abs(this._video.playbackRate - speed) > 0.001) {
-				this._video.playbackRate = speed;
-			}
+			this._pushRate();
 
 			this._valueEl.textContent = speed.toFixed(2);
 			this._slider.setAttribute("aria-valuenow", String(speed));
@@ -324,19 +372,47 @@
 		}
 	}
 
+	// YouTube is a SPA that builds and rebuilds its player controls whenever
+	// it likes (first load, navigation, fullscreen, ads), so one attempt at
+	// load time isn't enough. Instead we check on every DOM change (at most
+	// once per frame) and (re)attach whenever the pill is missing.
+	let current = null;
+
 	function tryAttach() {
-		const video = document.querySelector("video");
 		const volumeArea = document.querySelector(
-			".ytp-volume-area:not(.yt-speed-slider-area)",
+			".html5-video-player .ytp-volume-area:not(.yt-speed-slider-area)",
 		);
-		if (!video || !volumeArea) return;
+		if (!volumeArea) return;
 
-		if (volumeArea.dataset.YTSpeedSettingsSliderPlus === "1") return;
-		volumeArea.dataset.YTSpeedSettingsSliderPlus = "1";
+		// The player's own <video>, not just the first one on the page.
+		const video = volumeArea
+			.closest(".html5-video-player")
+			.querySelector("video");
+		if (!video) return;
 
-		new Instance(video, volumeArea);
+		if (current && current.isAttachedTo(video, volumeArea)) return;
+
+		if (current) current.destroy();
+		current = new Instance(video, volumeArea);
 	}
 
+	let attachQueued = false;
+	function scheduleAttach() {
+		if (attachQueued) return;
+		attachQueued = true;
+		requestAnimationFrame(() => {
+			attachQueued = false;
+			tryAttach();
+		});
+	}
+
+	new MutationObserver(scheduleAttach).observe(document.documentElement, {
+		childList: true,
+		subtree: true,
+	});
+	document.addEventListener("yt-navigate-finish", scheduleAttach);
+	document.addEventListener("fullscreenchange", scheduleAttach);
+	window.addEventListener("pageshow", scheduleAttach);
+
 	tryAttach();
-	document.addEventListener("yt-navigate-finish", tryAttach);
 })();
