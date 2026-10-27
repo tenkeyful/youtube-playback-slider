@@ -41,6 +41,9 @@
 
 .yt-speed-slider-slot {
 	display: grid;
+	/* One fixed-width column. Without it the column grows to fit the invisible
+	   number, overflows the slot to the right and pushes the icon off-centre. */
+	grid-template-columns: minmax(0, 1fr);
 	place-items: center;
 	width: var(--yssp-icon);
 	height: 24px;
@@ -61,7 +64,6 @@
     display: block;
     width: var(--yssp-icon);
     height: var(--yssp-icon);
-    transform: translateX(-1.5px);
     opacity: 1;
 }
 
